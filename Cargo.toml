@@ -1,0 +1,12 @@
+[package]
+name = "zero"
+version = "1.0.0"
+license = "MIT License"
+authors = ["sortiz4 <sortiz832@gmail.com>"]
+
+[[bin]]
+name = "zero"
+doc = false
+
+[dependencies]
+getopts = "0.2.14"
