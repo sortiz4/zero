@@ -14,6 +14,13 @@ pub const MCONFLICT: &'static str = "conflicting options";
 /// The program cannot read from the standard input.
 pub const MSTDINERR: &'static str = "cannot read from stdin";
 
+/// Prepends the program name to the given message.
+#[macro_export]
+macro_rules! formatsys {
+    ($fmt:expr) => (format!(concat!("{}: ", $fmt), text::NAME));
+    ($fmt:expr, $($arg:tt)*) => (format!(concat!("{}: ", $fmt), text::NAME, $($arg)*));
+}
+
 /// Writes a formatted system message to the standard error.
 #[macro_export]
 macro_rules! sys {
@@ -26,11 +33,4 @@ macro_rules! sys {
 macro_rules! sysln {
     ($fmt:expr) => (sys!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => (sys!(concat!($fmt, "\n"), $($arg)*));
-}
-
-/// A system message prepends the program name to the given message.
-#[macro_export]
-macro_rules! formatsys {
-    ($fmt:expr) => (format!(concat!("{}: ", $fmt), text::NAME));
-    ($fmt:expr, $($arg:tt)*) => (format!(concat!("{}: ", $fmt), text::NAME, $($arg)*));
 }

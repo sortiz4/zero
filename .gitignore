@@ -3,6 +3,7 @@
 *.log
 
 # Project folders
+.idea
 target
 
 # Windows files and folders

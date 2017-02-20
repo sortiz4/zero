@@ -17,10 +17,8 @@ fn main() {
 
 fn zero(args: Vec<String>) -> i32 {
 
-    // Create the command line options
+    // Create and parse the command line options
     let options = opts::create_options();
-
-    // Parse command line options from the given arguments
     let matches = match opts::parse_options(&args, &options) {
         Ok(v) => v,
         Err(e) => {

@@ -1,4 +1,4 @@
-//! Defines the options available to `zero`.
+//! Defines the options available.
 use getopts::Matches;
 use getopts::Options;
 use super::error;
@@ -39,7 +39,7 @@ pub const INTERACTIVE: Option<'static> = Option {
 pub const RECURSIVE: Option<'static> = Option {
     short: "r",
     long: "recursive",
-    description: "Recursively overwrite all directories"
+    description: "Recursively descend into directories"
 };
 
 /// Defines the 'suppress' option flag.
@@ -76,8 +76,6 @@ macro_rules! format_help_error {
 
 /// Initializes a set of options from the option definitions.
 pub fn create_options() -> Options {
-
-    // Initialize options -- order affects output
     let mut options = Options::new();
     options.optflag(DRYRUN.short, DRYRUN.long, DRYRUN.description);
     options.optflag(HELP.short, HELP.long, HELP.description);
@@ -91,25 +89,17 @@ pub fn create_options() -> Options {
 
 /// Parses a set of arguments into a set of matches.
 pub fn parse_options(args: &Vec<String>, options: &Options) -> Result<Matches, String> {
-
-    // Parse the options from the given arguments
     let matches = match options.parse(&args[1..]) {
         Ok(v) => v,
-        Err(e) => {
-          let msg = format_help_error!("{}", format_opts_error!(e));
-          return Err(msg);
-        },
+        Err(e) => return Err(format_help_error!("{}", format_opts_error!(e))),
     };
     return Ok(matches);
 }
 
 /// Checks for conflicts in the set of matches.
 pub fn check_conflicts(matches: &Matches) -> Result<(), String> {
-
-    // Interactive and suppressive modes are incompatible
     if matches.opt_present(INTERACTIVE.short) && matches.opt_present(SUPPRESS.short) {
-        let msg = format_help_error!("{}: '{}', '{}'", error::MCONFLICT, INTERACTIVE.long, SUPPRESS.long);
-        return Err(msg);
+        return Err(format_help_error!("{}: '{}', '{}'", error::MCONFLICT, INTERACTIVE.long, SUPPRESS.long));
     }
     return Ok(());
 }

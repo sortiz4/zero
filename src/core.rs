@@ -1,4 +1,4 @@
-//! Defines the core functionality behind `zero`.
+//! Defines the core functionality.
 use getopts::Matches;
 use std::fs::OpenOptions;
 use std::io;
@@ -13,9 +13,9 @@ use super::text;
 
 /// Named constants used to indicate the authorization context.
 pub enum Auth {
-    /// The given path is absolute (has root).
+    /// The path is absolute (has root).
     Absolute,
-    /// The user has requested interaction.
+    /// The 'interactive' option is present.
     Interactive,
 }
 
@@ -56,8 +56,9 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
     }
 }
 
-/// Adds all files in `dir` to `list`. If the 'recursive' option is given,
-/// `collect_files` will add all files under `dir` to `list`.
+/// Adds all files *in* the given directory to the `list`. If the 'recursive'
+/// option is present, all files *under* the given directory will be added to
+/// the `list`.
 pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> Result<()> {
 
     // Iterate over all entries in the directory
@@ -76,9 +77,9 @@ pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> 
     return Ok(());
 }
 
-/// Zero-outs the given file. Authorization may be requested and additional
+/// Overwrites the given file. Authorization may be requested and additional
 /// information may be printed if the 'interactive' and 'verbose' options are
-/// given. The file will not be overwritten during a 'dry-run'.
+/// present. The file will not be overwritten during a 'dry-run'.
 pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
 
     // Authorize every file (optional)
@@ -99,7 +100,7 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
         let mut file = try!(OpenOptions::new().write(true).open(path));
         let mut buffer = BufWriter::new(file);
 
-        // Zero-out the buffer
+        // Overwrite the file
         for _ in 0..metadata.len() {
             try!(buffer.write(b"\0"));
         }
@@ -118,10 +119,9 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
     return Ok(());
 }
 
-/// Calls `overwrite_file` for each file in `list` and handles all associated errors.
+/// Calls `overwrite_file` for each file in the `list` and handles all
+/// associated errors internally.
 pub fn overwrite_files(list: &Vec<PathBuf>, matches: &Matches) {
-
-    // Overwrite all files in the list
     for file in list.iter() {
         match overwrite_file(file, matches) {
             Ok(_) => (),

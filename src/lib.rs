@@ -1,6 +1,6 @@
-//! A fast, simple, single-pass command line utility that securely wipes files
-//! by zeroing them out. `zero` is non-recursive and non-verbose by default.
-//! Inputs must be explicitly provided or no overwrites will occur.
+//! Zero is a fast, simple, single-pass command line utility that securely
+//! erases files by zero-filling them. It's non-recursive and non-verbose by
+//! default, and always prompts the user before descending into absolute paths.
 extern crate getopts;
 #[macro_use]
 pub mod error;

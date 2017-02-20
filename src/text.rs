@@ -9,7 +9,7 @@ pub const HELP: &'static str = "\
 Try 'zero --help' for more information.";
 /// A brief description of the program and its usage.
 pub const USAGE: &'static str = "\
-Zero-out files at the given locations (single-pass).
+Securely erase files (single-pass).
 \nUsage:\n    zero [OPTIONS] [DIRS|FILES]";
 
 /// A descriptor that maps to the `Auth::Absolute` context.
