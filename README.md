@@ -5,7 +5,7 @@ always prompts the user before descending into absolute paths.
 
 #### Usage
 
-```shell
+```
 Securely erase files (single-pass).
 
 Usage:
