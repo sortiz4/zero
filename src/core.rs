@@ -26,10 +26,10 @@ pub enum Auth {
 /// - If the standard input is closed or empty, no error will be raised and the
 /// loop will continue indefinitely.
 pub fn auth(path: &Path, auth: Auth) -> bool {
-    let stdin_err = formatsys!("{}", error::MSTDINERR);
+    let stdin_err = format_sys!("{}", error::MSTDINERR);
 
     // Determine the appropriate prompt
-    let msg = match auth {
+    let prompt = match auth {
         Auth::Absolute => text::ABSOLUTE,
         Auth::Interactive => text::INTERACTIVE,
     };
@@ -39,19 +39,22 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
         let mut input = String::new();
 
         // Print a confirmation prompt and wait for input
-        sys!("'{}' {} {} ", path.display(), msg, text::CONTINUE).unwrap();
-        io::stdin().read_line(&mut input).expect(stdin_err.as_str());
+        sys!("'{}' {} {} ", path.display(), prompt, text::CONTINUE).unwrap();
+        io::stdin().read_line(&mut input).expect(&stdin_err);
 
         // Normalize the input for comparison
         input = input.trim().to_lowercase();
-        let normal = input.as_str();
 
         // The response must be YES or NO
-        if normal == text::NO {
-            sysln!("{}", text::SKIP).unwrap();
-            return false;
-        } else if normal == text::YES {
-            return true;
+        match input.as_str() {
+            text::YES => {
+                return true;
+            },
+            text::NO => {
+                sysln!("{}", text::SKIP).unwrap();
+                return false;
+            },
+            _ => continue,
         }
     }
 }

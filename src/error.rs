@@ -16,7 +16,7 @@ pub const MSTDINERR: &'static str = "cannot read from stdin";
 
 /// Prepends the program name to the given message.
 #[macro_export]
-macro_rules! formatsys {
+macro_rules! format_sys {
     ($fmt:expr) => (format!(concat!("{}: ", $fmt), text::NAME));
     ($fmt:expr, $($arg:tt)*) => (format!(concat!("{}: ", $fmt), text::NAME, $($arg)*));
 }
@@ -24,8 +24,8 @@ macro_rules! formatsys {
 /// Writes a formatted system message to the standard error.
 #[macro_export]
 macro_rules! sys {
-    ($fmt:expr) => (write!(&mut ::std::io::stderr(), "{}", formatsys!($fmt)));
-    ($fmt:expr, $($arg:tt)*) => (write!(&mut ::std::io::stderr(), "{}", formatsys!($fmt, $($arg)*)));
+    ($fmt:expr) => (write!(&mut ::std::io::stderr(), "{}", format_sys!($fmt)));
+    ($fmt:expr, $($arg:tt)*) => (write!(&mut ::std::io::stderr(), "{}", format_sys!($fmt, $($arg)*)));
 }
 
 /// Writes a formatted system message to the standard error with a new line.

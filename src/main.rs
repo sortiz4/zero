@@ -52,7 +52,7 @@ fn zero(args: Vec<String>) -> i32 {
     for item in matches.free.iter() {
 
         // Create a path and a new list of files
-        let path = Path::new(item.as_str());
+        let path = Path::new(item);
         let mut list: Vec<PathBuf> = Vec::new();
 
         // Authorize absolute paths (optional)
