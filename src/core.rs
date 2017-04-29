@@ -35,7 +35,7 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
     };
 
     loop {
-        // The input buffer must be reset with every pass
+        // Reset the input buffer with every pass
         let mut input = String::new();
 
         // Print a confirmation prompt and wait for input
@@ -47,9 +47,7 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
 
         // The response must be YES or NO
         match input.as_str() {
-            text::YES => {
-                return true;
-            },
+            text::YES => return true,
             text::NO => {
                 sysln!("{}", text::SKIP).unwrap();
                 return false;

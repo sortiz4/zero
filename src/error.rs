@@ -6,13 +6,13 @@ pub const ESUCCESS: i32 = 0x00;
 pub const EUSAGE: i32 = 0x01;
 
 /// The file or directory cannot be accessed.
-pub const MACCESS: &'static str = "cannot access";
+pub const MACCESS: &str = "cannot access";
 /// The file or directory cannot be found.
-pub const MNOTFOUND: &'static str = "cannot not be found";
+pub const MNOTFOUND: &str = "cannot not be found";
 /// A usage error where conflicting options are present.
-pub const MCONFLICT: &'static str = "conflicting options";
+pub const MCONFLICT: &str = "conflicting options";
 /// The program cannot read from the standard input.
-pub const MSTDINERR: &'static str = "cannot read from stdin";
+pub const MSTDINERR: &str = "cannot read from stdin";
 
 /// Prepends the program name to the given message.
 #[macro_export]
