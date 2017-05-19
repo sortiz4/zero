@@ -63,12 +63,12 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
 pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> Result<()> {
 
     // Iterate over all entries in the directory
-    for entry in try!(dir.read_dir()) {
-        let path = try!(entry).path();
+    for entry in dir.read_dir()? {
+        let path = entry?.path();
 
         // Recurse if the entry is a directory (optional)
         if matches.opt_present(opts::RECURSIVE.short) && path.is_dir() {
-            try!(collect_files(&path, list, matches));
+            collect_files(&path, list, matches)?;
 
         // If the entry is a file, add it to the list
         } else if path.is_file() {
@@ -92,23 +92,23 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
     }
 
     // Unwrap the file metadata
-    let metadata = try!(path.metadata());
+    let metadata = path.metadata()?;
     
     // Overwrite the file or perform a dry run (optional)
     if !matches.opt_present(opts::DRYRUN.short) {
 
         // Open the file and wrap it in a buffered writer
-        let mut file = try!(OpenOptions::new().write(true).open(path));
+        let mut file = OpenOptions::new().write(true).open(path)?;
         let mut buffer = BufWriter::new(file);
 
         // Overwrite the file
         for _ in 0..metadata.len() {
-            try!(buffer.write(b"\0"));
+            buffer.write(b"\0")?;
         }
 
         // Flush the buffer and write to the disk
-        file = try!(buffer.into_inner());
-        try!(file.sync_all());
+        file = buffer.into_inner()?;
+        file.sync_all()?;
 
         // Print the result to the standard output (optional)
         if matches.opt_present(opts::VERBOSE.short) {
