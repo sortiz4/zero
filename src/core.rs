@@ -26,7 +26,7 @@ pub enum Auth {
 /// - If the standard input is closed or empty, no error will be raised and the
 /// loop will continue indefinitely.
 pub fn auth(path: &Path, auth: Auth) -> bool {
-    let stdin_err = format_sys!("{}", error::MSTDINERR);
+    let stdin_err = sformat!("{}", error::MSTDINERR);
 
     // Determine the appropriate prompt
     let prompt = match auth {
@@ -39,7 +39,7 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
         let mut input = String::new();
 
         // Print a confirmation prompt and wait for input
-        sys!("'{}' {} {} ", path.display(), prompt, text::CONTINUE).unwrap();
+        sprint!("'{}' {} {} ", path.display(), prompt, text::CONTINUE);
         io::stdin().read_line(&mut input).expect(&stdin_err);
 
         // Normalize the input for comparison
@@ -49,7 +49,7 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
         match input.as_str() {
             text::YES => return true,
             text::NO => {
-                sysln!("{}", text::SKIP).unwrap();
+                sprintln!("{}", text::SKIP);
                 return false;
             },
             _ => continue,
@@ -127,7 +127,7 @@ pub fn overwrite_files(list: &Vec<PathBuf>, matches: &Matches) {
         match overwrite_file(file, matches) {
             Ok(_) => (),
             Err(e) => {
-                sysln!("{} '{}': {}", error::MACCESS, file.display(), e).unwrap();
+                sprintln!("{} '{}': {}", error::MACCESS, file.display(), e);
                 continue;
             },
         }

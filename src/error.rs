@@ -14,23 +14,43 @@ pub const MCONFLICT: &str = "conflicting options";
 /// The program cannot read from the standard input.
 pub const MSTDINERR: &str = "cannot read from stdin";
 
+#[macro_export]
+macro_rules! eprint {
+    ($fmt:expr) => {{
+        use std::io::{self, Write};
+        write!(&mut io::stderr(), $fmt).unwrap();
+    }};
+    ($fmt:expr, $($arg:tt)*) => {{
+        use std::io::{self, Write};
+        write!(&mut io::stderr(), $fmt, $($arg)*).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    () => (eprint!("\n"));
+    ($fmt:expr) => (eprint!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (eprint!(concat!($fmt, "\n"), $($arg)*));
+}
+
 /// Prepends the program name to the given message.
 #[macro_export]
-macro_rules! format_sys {
+macro_rules! sformat {
     ($fmt:expr) => (format!(concat!("{}: ", $fmt), text::NAME));
     ($fmt:expr, $($arg:tt)*) => (format!(concat!("{}: ", $fmt), text::NAME, $($arg)*));
 }
 
 /// Writes a formatted system message to the standard error.
 #[macro_export]
-macro_rules! sys {
-    ($fmt:expr) => (write!(&mut ::std::io::stderr(), "{}", format_sys!($fmt)));
-    ($fmt:expr, $($arg:tt)*) => (write!(&mut ::std::io::stderr(), "{}", format_sys!($fmt, $($arg)*)));
+macro_rules! sprint {
+    ($fmt:expr) => (eprint!("{}", sformat!($fmt)));
+    ($fmt:expr, $($arg:tt)*) => (eprint!("{}", sformat!($fmt, $($arg)*)));
 }
 
 /// Writes a formatted system message to the standard error with a new line.
 #[macro_export]
-macro_rules! sysln {
-    ($fmt:expr) => (sys!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (sys!(concat!($fmt, "\n"), $($arg)*));
+macro_rules! sprintln {
+    () => (sprint!("\n"));
+    ($fmt:expr) => (sprint!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (sprint!(concat!($fmt, "\n"), $($arg)*));
 }

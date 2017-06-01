@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate zero;
 use std::env;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -22,7 +21,7 @@ fn zero(args: Vec<String>) -> i32 {
     let matches = match opts::parse_options(&args, &options) {
         Ok(v) => v,
         Err(e) => {
-            sysln!("{}", e).unwrap();
+            sprintln!("{}", e);
             return error::EUSAGE;
         },
     };
@@ -31,7 +30,7 @@ fn zero(args: Vec<String>) -> i32 {
     match opts::check_conflicts(&matches) {
         Ok(_) => (),
         Err(e) => {
-            sysln!("{}", e).unwrap();
+            sprintln!("{}", e);
             return error::EUSAGE;
         },
     }
@@ -68,7 +67,7 @@ fn zero(args: Vec<String>) -> i32 {
             match core::collect_files(&path, &mut list, &matches) {
                 Ok(_) => (),
                 Err(e) => {
-                    sysln!("{} '{}': {}", error::MACCESS, item, e).unwrap();
+                    sprintln!("{} '{}': {}", error::MACCESS, item, e);
                     continue;
                 },
             }
@@ -79,7 +78,7 @@ fn zero(args: Vec<String>) -> i32 {
 
         // The path could not be found otherwise
         } else {
-            sysln!("'{}' {}", item, error::MNOTFOUND).unwrap();
+            sprintln!("'{}' {}", item, error::MNOTFOUND);
         }
 
         // Overwrite each file in the list
