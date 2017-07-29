@@ -5,12 +5,12 @@ pub const NAME: &str = "zero";
 /// The program version.
 pub const VERSION: &str = "1.0";
 /// A generic help message.
-pub const HELP: &str = "\
-Try 'zero --help' for more information.";
+pub const HELP: &str = "Try 'zero --help' for more information.";
 /// A brief description of the program and its usage.
-pub const USAGE: &str = "\
-Securely erase files (single-pass).
-\nUsage:\n    zero [OPTIONS] [DIRS|FILES]";
+pub const USAGE: &str = concat![
+    "Securely erase files (single-pass).\n\n",
+    "Usage:\n", "    zero [OPTIONS] [PATHS]",
+];
 
 /// A descriptor that maps to the `Auth::Absolute` context.
 pub const ABSOLUTE: &str = "is absolute";

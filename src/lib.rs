@@ -3,7 +3,8 @@
 //! default, and always prompts the user before descending into absolute paths.
 extern crate getopts;
 #[macro_use]
-pub mod error;
+pub mod macros;
 pub mod core;
 pub mod opts;
+pub mod status;
 pub mod text;

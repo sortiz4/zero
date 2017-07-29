@@ -9,7 +9,7 @@ always prompts the user before descending into absolute paths.
 Securely erase files (single-pass).
 
 Usage:
-    zero [OPTIONS] [DIRS|FILES]
+    zero [OPTIONS] [PATHS]
 
 Options:
     -d, --dry-run       Do not overwrite any files (verbose)

@@ -7,8 +7,8 @@ use std::io::Result;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-use super::error;
 use super::opts;
+use super::status;
 use super::text;
 
 /// Named constants used to indicate the authorization context.
@@ -26,7 +26,7 @@ pub enum Auth {
 /// - If the standard input is closed or empty, no error will be raised and the
 /// loop will continue indefinitely.
 pub fn auth(path: &Path, auth: Auth) -> bool {
-    let stdin_err = sformat!("{}", error::MSTDINERR);
+    let stdin_err = formats!("{}", status::MSTDINERR);
 
     // Determine the appropriate prompt
     let prompt = match auth {
@@ -69,7 +69,6 @@ pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> 
         // Recurse if the entry is a directory (optional)
         if matches.opt_present(opts::RECURSIVE.short) && path.is_dir() {
             collect_files(&path, list, matches)?;
-
         // If the entry is a file, add it to the list
         } else if path.is_file() {
             list.push(path);
@@ -85,9 +84,8 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
 
     // Authorize every file (optional)
     if matches.opt_present(opts::INTERACTIVE.short) && !matches.opt_present(opts::SUPPRESS.short) {
-        match auth(&path, Auth::Interactive) {
-            true => (),
-            false => return Ok(()),
+        if let false = auth(&path, Auth::Interactive) {
+            return Ok(());
         }
     }
 
@@ -103,7 +101,7 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
 
         // Overwrite the file
         for _ in 0..metadata.len() {
-            buffer.write(b"\0")?;
+            buffer.write(&[0x00])?;
         }
 
         // Flush the buffer and write to the disk
@@ -124,12 +122,9 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
 /// associated errors internally.
 pub fn overwrite_files(list: &Vec<PathBuf>, matches: &Matches) {
     for file in list.iter() {
-        match overwrite_file(file, matches) {
-            Ok(_) => (),
-            Err(e) => {
-                sprintln!("{} '{}': {}", error::MACCESS, file.display(), e);
-                continue;
-            },
+        if let Err(err) = overwrite_file(file, matches) {
+            sprintln!("{} '{}': {}", status::MACCESS, file.display(), err);
+            continue;
         }
     }
 }
