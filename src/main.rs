@@ -15,8 +15,7 @@ fn main() {
 }
 
 fn zero(args: Vec<String>) -> i32 {
-
-    // Create and parse the command line options
+    // Parse the command line options
     let options = opts::create_options();
     let matches = match opts::parse_options(&args, &options) {
         Ok(val) => val,
@@ -36,15 +35,13 @@ fn zero(args: Vec<String>) -> i32 {
     if matches.opt_present(opts::HELP.short) {
         print!("{}", options.usage(text::USAGE));
         return status::ESUCCESS;
-    }
-
     // Display the version and exit (optional)
-    if matches.opt_present(opts::VERSION.short) {
+    } else if matches.opt_present(opts::VERSION.short) {
         println!("{} {}", text::NAME, text::VERSION);
         return status::ESUCCESS;
     }
 
-    // Loop through the free arguments (directories and files)
+    // Loop through the free arguments (paths)
     for item in matches.free.iter() {
 
         // Create a path and a new list of files

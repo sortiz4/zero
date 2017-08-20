@@ -27,6 +27,7 @@ pub enum Auth {
 /// loop will continue indefinitely.
 pub fn auth(path: &Path, auth: Auth) -> bool {
     let stdin_err = formats!("{}", status::MSTDINERR);
+    let mut input = String::new();
 
     // Determine the appropriate prompt
     let prompt = match auth {
@@ -35,14 +36,9 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
     };
 
     loop {
-        // Reset the input buffer with every pass
-        let mut input = String::new();
-
-        // Print a confirmation prompt and wait for input
+        // Prompt the user and normalize the input
         sprint!("'{}' {} {} ", path.display(), prompt, text::CONTINUE);
         io::stdin().read_line(&mut input).expect(&stdin_err);
-
-        // Normalize the input for comparison
         input = input.trim().to_lowercase();
 
         // The response must be YES or NO
@@ -52,7 +48,10 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
                 sprintln!("{}", text::SKIP);
                 return false;
             },
-            _ => continue,
+            _ => {
+                input.clear();
+                continue;
+            },
         }
     }
 }
@@ -61,11 +60,9 @@ pub fn auth(path: &Path, auth: Auth) -> bool {
 /// option is present, all files *under* the given directory will be added to
 /// the `list`.
 pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> Result<()> {
-
     // Iterate over all entries in the directory
     for entry in dir.read_dir()? {
         let path = entry?.path();
-
         // Recurse if the entry is a directory (optional)
         if matches.opt_present(opts::RECURSIVE.short) && path.is_dir() {
             collect_files(&path, list, matches)?;
@@ -81,17 +78,14 @@ pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> 
 /// information may be printed if the 'interactive' and 'verbose' options are
 /// present. The file will not be overwritten during a 'dry-run'.
 pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
-
     // Authorize every file (optional)
     if matches.opt_present(opts::INTERACTIVE.short) && !matches.opt_present(opts::SUPPRESS.short) {
         if let false = auth(&path, Auth::Interactive) {
             return Ok(());
         }
     }
-
-    // Unwrap the file metadata
     let metadata = path.metadata()?;
-    
+
     // Overwrite the file or perform a dry run (optional)
     if !matches.opt_present(opts::DRYRUN.short) {
 
