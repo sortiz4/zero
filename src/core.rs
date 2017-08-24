@@ -63,10 +63,11 @@ pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> 
     // Iterate over all entries in the directory
     for entry in dir.read_dir()? {
         let path = entry?.path();
-        // Recurse if the entry is a directory (optional)
+        // Recurse if the entry is a directory
+        // (optional), otherwise add the entry
+        // to the list
         if matches.opt_present(opts::RECURSIVE.short) && path.is_dir() {
             collect_files(&path, list, matches)?;
-        // If the entry is a file, add it to the list
         } else if path.is_file() {
             list.push(path);
         }

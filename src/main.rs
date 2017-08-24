@@ -16,8 +16,8 @@ fn main() {
 
 fn zero(args: Vec<String>) -> i32 {
     // Parse the command line options
-    let options = opts::create_options();
-    let matches = match opts::parse_options(&args, &options) {
+    let options = opts::create();
+    let matches = match opts::parse(&args, &options) {
         Ok(val) => val,
         Err(err) => {
             sprintln!("{}", err);
@@ -25,28 +25,25 @@ fn zero(args: Vec<String>) -> i32 {
         },
     };
 
-    // Check for conflicting options
-    if let Err(err) = opts::check_conflicts(&matches) {
-        sprintln!("{}", err);
-        return status::EUSAGE;
-    }
-
-    // Display the help message and exit (optional)
+    // Display the help message or version and exit (optional)
     if matches.opt_present(opts::HELP.short) {
         print!("{}", options.usage(text::USAGE));
         return status::ESUCCESS;
-    // Display the version and exit (optional)
     } else if matches.opt_present(opts::VERSION.short) {
         println!("{} {}", text::NAME, text::VERSION);
         return status::ESUCCESS;
     }
 
-    // Loop through the free arguments (paths)
-    for item in matches.free.iter() {
+    // Check for conflicting options
+    if let Err(err) = opts::validate(&matches) {
+        sprintln!("{}", err);
+        return status::EUSAGE;
+    }
 
-        // Create a path and a new list of files
+    // Loop through the free arguments (paths)
+    let mut list: Vec<PathBuf> = Vec::new();
+    for item in matches.free.iter() {
         let path = Path::new(item);
-        let mut list: Vec<PathBuf> = Vec::new();
 
         // Authorize absolute paths (optional)
         if !matches.opt_present(opts::SUPPRESS.short) && path.has_root() {
@@ -55,16 +52,17 @@ fn zero(args: Vec<String>) -> i32 {
             }
         }
 
-        // Collect files in a directory
-        if path.is_dir() {
-            if let Err(err) = core::collect_files(&path, &mut list, &matches) {
-                sprintln!("{} '{}': {}", status::MACCESS, item, err);
-                continue;
+        // Verify that the path exists in the file system
+        if path.exists() {
+            // Collect files in directories or collect single files
+            if path.is_dir() {
+                if let Err(err) = core::collect_files(&path, &mut list, &matches) {
+                    sprintln!("{} '{}': {}", status::MACCESS, item, err);
+                    continue;
+                }
+            } else if path.is_file() {
+                list.push(path.to_owned());
             }
-        // Collect single files
-        } else if path.is_file() {
-            list.push(path.to_owned());
-        // The path could not be found otherwise
         } else {
             sprintln!("'{}' {}", item, status::MNOTFOUND);
         }
@@ -72,6 +70,7 @@ fn zero(args: Vec<String>) -> i32 {
         // Overwrite each file in the list
         if list.len() > 0 {
             core::overwrite_files(&list, &matches);
+            list.clear(); // Truncate the list
         }
     }
     return status::ESUCCESS;

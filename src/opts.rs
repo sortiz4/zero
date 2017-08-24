@@ -64,7 +64,7 @@ macro_rules! optflags {
 }
 
 /// Reformats the `getopts` error message.
-macro_rules! opts {
+macro_rules! reopt {
     ($var:expr) => ($var.to_string().to_lowercase().trim_right_matches(".").to_owned());
 }
 
@@ -75,23 +75,23 @@ macro_rules! help {
 }
 
 /// Initializes a set of options from the option definitions.
-pub fn create_options() -> Options {
+pub fn create() -> Options {
     let mut options = Options::new();
     optflags![options; DRYRUN, HELP, INTERACTIVE, RECURSIVE, SUPPRESS, VERBOSE, VERSION];
     return options;
 }
 
 /// Parses a set of arguments into a set of matches.
-pub fn parse_options(args: &Vec<String>, options: &Options) -> Result<Matches, String> {
+pub fn parse(args: &Vec<String>, options: &Options) -> Result<Matches, String> {
     let matches = match options.parse(&args[1..]) {
         Ok(val) => val,
-        Err(err) => return Err(help!("{}", opts!(err))),
+        Err(err) => return Err(help!("{}", reopt!(err))),
     };
     return Ok(matches);
 }
 
 /// Checks for conflicts in the set of matches.
-pub fn check_conflicts(matches: &Matches) -> Result<(), String> {
+pub fn validate(matches: &Matches) -> Result<(), String> {
     if matches.opt_present(INTERACTIVE.short) && matches.opt_present(SUPPRESS.short) {
         return Err(help!("{}: '{}', '{}'", status::MCONFLICT, INTERACTIVE.long, SUPPRESS.long));
     }
