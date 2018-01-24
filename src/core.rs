@@ -99,7 +99,7 @@ pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
             buffer.write(&[0x00])?;
         }
 
-        // Flush the buffer and write to the disk
+        // Flush the buffer to the disk
         file = buffer.into_inner()?;
         file.sync_all()?;
 
