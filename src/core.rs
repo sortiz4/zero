@@ -1,125 +1,275 @@
-//! Defines the core functionality.
-use getopts::Matches;
+use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::BufWriter;
-use std::io::Result;
+use std::io::Stderr;
+use std::io::Stdin;
+use std::io::Stdout;
 use std::io::Write;
-use std::path::Path;
 use std::path::PathBuf;
-use super::opts;
-use super::status;
-use super::text;
+use structopt::StructOpt;
+use super::Error;
+use super::Result;
 
-/// Named constants used to indicate the authorization context.
-pub enum Auth {
+enum Context {
     /// The path is absolute (has root).
     Absolute,
-    /// The 'interactive' option is present.
+    /// The `interactive` option is present.
     Interactive,
 }
 
-/// Authorizes directory and file access by prompting the user and reading the
-/// standard input. `true` will be returned if the user grants permission and
-/// `false` will be returned otherwise.
-/// # Issues
-/// - If the standard input is closed or empty, no error will be raised and the
-/// loop will continue indefinitely.
-pub fn auth(path: &Path, auth: Auth) -> bool {
-    let stdin_err = formats!("{}", status::MSTDINERR);
-    let mut input = String::new();
+#[derive(Debug, StructOpt)]
+#[structopt(about = "Securely erase files (single-pass).")]
+struct Options {
+    /// Do not overwrite any files (verbose).
+    #[structopt(short = "d", long = "dry-run")]
+    dry_run: bool,
 
-    // Determine the appropriate prompt
-    let prompt = match auth {
-        Auth::Absolute => text::ABSOLUTE,
-        Auth::Interactive => text::INTERACTIVE,
-    };
+    /// Prompt before overwriting each file.
+    #[structopt(short = "i", long = "interactive")]
+    interactive: bool,
 
-    loop {
-        // Prompt the user and normalize the input
-        sprint!("'{}' {} {} ", path.display(), prompt, text::CONTINUE);
-        io::stdin().read_line(&mut input).expect(&stdin_err);
-        input = input.trim().to_lowercase();
+    /// Recursively descend into directories.
+    #[structopt(short = "r", long = "recursive")]
+    recursive: bool,
 
-        // The response must be YES or NO
-        match input.as_str() {
-            text::YES => return true,
-            text::NO => {
-                sprintln!("{}", text::SKIP);
-                return false;
+    /// Suppress all interaction.
+    #[structopt(short = "s", long = "suppress")]
+    suppress: bool,
+
+    /// Explain what's being done.
+    #[structopt(short = "V", long = "verbose")]
+    verbose: bool,
+
+    /// Show this message.
+    #[structopt(short = "h", long = "help")]
+    help: bool,
+
+    /// Show the version.
+    #[structopt(short = "v", long = "version")]
+    version: bool,
+
+    /// The paths to be accessed by the tool.
+    #[structopt(name = "PATHS", parse(from_str))]
+    paths: Vec<PathBuf>,
+}
+
+pub struct Zero {
+    options: Options,
+    stderr: Stderr,
+    stdout: Stdout,
+    stdin: Stdin,
+}
+
+impl Zero {
+    /// Constructs this program from an iterable of arguments.
+    pub fn from_iter<I>(iter: I) -> Result<Self>
+    where
+        Self: Sized,
+        I: IntoIterator,
+        I::Item: Into<OsString> + Clone,
+    {
+        return Ok(
+            Self {
+                options: Options::from_iter_safe(iter)?,
+                stderr: io::stderr(),
+                stdout: io::stdout(),
+                stdin: io::stdin(),
+            }
+        );
+    }
+
+    /// Replaces the standard error stream for this program.
+    pub fn stderr(&mut self, stderr: Stderr) -> &mut Self {
+        self.stderr = stderr;
+        return self;
+    }
+
+    /// Replaces the standard output stream for this program.
+    pub fn stdout(&mut self, stdout: Stdout) -> &mut Self {
+        self.stdout = stdout;
+        return self;
+    }
+
+    /// Replaces the standard input stream for this program.
+    pub fn stdin(&mut self, stdin: Stdin) -> &mut Self {
+        self.stdin = stdin;
+        return self;
+    }
+
+    /// Runs this program and writes all errors.
+    pub fn run(&mut self) -> Result<()> {
+        match self.run_inner() {
+            Ok(val) => {
+                return Ok(val);
             },
-            _ => {
-                input.clear();
-                continue;
+            Err(err) => {
+                writeln!(self.stderr, "Error: {}", err)?;
+                return Err(err);
             },
         }
     }
-}
 
-/// Adds all files *in* the given directory to the `list`. If the 'recursive'
-/// option is present, all files *under* the given directory will be added to
-/// the `list`.
-pub fn collect_files(dir: &Path, list: &mut Vec<PathBuf>, matches: &Matches) -> Result<()> {
-    // Iterate over all entries in the directory
-    for entry in dir.read_dir()? {
-        let path = entry?.path();
-        // Recurse if the entry is a directory
-        // (optional), otherwise add the entry
-        // to the list
-        if matches.opt_present(opts::RECURSIVE.short) && path.is_dir() {
-            collect_files(&path, list, matches)?;
-        } else if path.is_file() {
-            list.push(path);
+    /// Runs this program.
+    fn run_inner(&mut self) -> Result<()> {
+        // Write the help or version message
+        if self.options.help {
+            return self.help();
+        }
+        if self.options.version {
+            return self.version();
+        }
+
+        // Check for conflicting options
+        self.validate()?;
+
+        // Loop through the paths
+        self.overwrite()?;
+        return Ok(());
+    }
+
+    /// Checks for conflicts in the options.
+    fn validate(&self) -> Result<()> {
+        return if self.options.interactive && self.options.suppress {
+            Err(Error::Conflict)
+        } else {
+            Ok(())
+        };
+    }
+
+    /// Writes the help message to the standard error stream.
+    fn help(&mut self) -> Result<()> {
+        Options::clap().write_help(&mut self.stderr)?;
+        writeln!(self.stderr, "")?;
+        return Ok(());
+    }
+
+    /// Writes the version message to the standard error stream.
+    fn version(&mut self) -> Result<()> {
+        Options::clap().write_version(&mut self.stderr)?;
+        writeln!(self.stderr, "")?;
+        return Ok(());
+    }
+
+    /// Authorizes directory and file access by prompting the user and reading
+    /// from the standard input stream.
+    fn auth(&mut self, path: &PathBuf, context: Context) -> Result<bool> {
+        // Determine the appropriate prompt
+        let prompt = match context {
+            Context::Absolute => "is absolute",
+            Context::Interactive => "will be overwritten",
+        };
+
+        let mut input = String::new();
+        loop {
+            // Prompt the user and normalize the input
+            write!(self.stderr, "{:#?} {} - continue? [y/n] ", path, prompt)?;
+            self.stdin.read_line(&mut input)?;
+
+            // The response must be `y` or `n`
+            match input.trim().to_lowercase().as_str() {
+                "n" => {
+                    if self.options.verbose {
+                        writeln!(self.stderr, "Skipped.")?;
+                    }
+                    return Ok(false);
+                },
+                "y" => {
+                    return Ok(true);
+                },
+                _ => {
+                    input.clear();
+                },
+            }
         }
     }
-    return Ok(());
-}
 
-/// Overwrites the given file. Authorization may be requested and additional
-/// information may be printed if the 'interactive' and 'verbose' options are
-/// present. The file will not be overwritten during a 'dry-run'.
-pub fn overwrite_file(path: &Path, matches: &Matches) -> Result<()> {
-    // Authorize every file (optional)
-    if matches.opt_present(opts::INTERACTIVE.short) && !matches.opt_present(opts::SUPPRESS.short) {
-        if let false = auth(&path, Auth::Interactive) {
-            return Ok(());
+    /// Overwrites all paths provided by the user. Authorization may be
+    /// requested if the `suppress` option is not present.
+    fn overwrite(&mut self) -> Result<()> {
+        for path in self.options.paths.to_owned() {
+            if !self.options.suppress && path.has_root() {
+                // Authorize absolute paths (optional)
+                if let Ok(false) = self.auth(&path, Context::Absolute) {
+                    continue;
+                }
+            }
+
+            if path.is_file() {
+                // The path is a valid file
+                self.overwrite_file(&path)?;
+            } else if path.is_dir() {
+                // The path is a valid directory
+                if let Err(err) = self.overwrite_dir(&path) {
+                    writeln!(self.stderr, "Error: Cannot access {:#?}: {}", path, err)?;
+                }
+            } else {
+                // The path could not be accessed
+                writeln!(self.stderr, "Error: Cannot access {:#?}", path)?;
+            }
         }
+        return Ok(());
     }
-    let metadata = path.metadata()?;
 
-    // Overwrite the file or perform a dry run (optional)
-    if !matches.opt_present(opts::DRYRUN.short) {
+    /// Overwrites all files in the given directory. If the `recursive` option
+    /// is present, all files under the given directory will overwritten.
+    fn overwrite_dir(&mut self, path: &PathBuf) -> Result<()> {
+        for entry in path.read_dir()? {
+            let path = entry?.path();
 
-        // Open the file and wrap it in a buffered writer
-        let mut file = OpenOptions::new().write(true).open(path)?;
-        let mut buffer = BufWriter::new(file);
-
-        // Overwrite the file
-        for _ in 0..metadata.len() {
-            buffer.write(&[0x00])?;
+            // Recurse if the entry is a directory (optional)
+            if self.options.recursive && path.is_dir() {
+                self.overwrite_dir(&path)?;
+            } else if path.is_file() {
+                self.overwrite_file(&path)?;
+            }
         }
-
-        // Flush the buffer to the disk
-        file = buffer.into_inner()?;
-        file.sync_all()?;
-
-        // Print the result to the standard output (optional)
-        if matches.opt_present(opts::VERBOSE.short) {
-            println!("'{}': {} {}", path.display(), metadata.len(), text::OVERWRITE);
-        }
-    } else {
-        println!("'{}': {} {}", path.display(), metadata.len(), text::DRYRUN);
+        return Ok(());
     }
-    return Ok(());
-}
 
-/// Calls `overwrite_file` for each file in the `list` and handles all
-/// associated errors internally.
-pub fn overwrite_files(list: &Vec<PathBuf>, matches: &Matches) {
-    for file in list.iter() {
-        if let Err(err) = overwrite_file(file, matches) {
-            sprintln!("{} '{}': {}", status::MACCESS, file.display(), err);
-            continue;
+    /// Overwrites the given file and writes all errors.
+    fn overwrite_file(&mut self, path: &PathBuf) -> Result<()> {
+        if let Err(err) = self.overwrite_file_inner(path) {
+            writeln!(self.stderr, "Error: Cannot overwrite {:#?}: {}", path, err)?;
         }
+        return Ok(());
+    }
+
+    /// Overwrites the given file. Authorization may be requested and
+    /// additional information may be written if the `interactive` and
+    /// `verbose` options are present. The file will not be overwritten
+    /// during a `dry-run`.
+    fn overwrite_file_inner(&mut self, path: &PathBuf) -> Result<()> {
+        if self.options.interactive {
+            // Authorize every file (optional)
+            if let Ok(false) = self.auth(&path, Context::Interactive) {
+                return Ok(());
+            }
+        }
+        let metadata = path.metadata()?;
+
+        if !self.options.dry_run {
+            // Open the file and wrap it in a buffer
+            let mut file = OpenOptions::new().write(true).open(path)?;
+            let mut buf = BufWriter::new(file);
+
+            // Overwrite the file
+            for _ in 0..metadata.len() {
+                buf.write(&[0])?;
+            }
+
+            // Flush the buffer to the disk
+            file = buf.into_inner()?;
+            file.sync_all()?;
+
+            if self.options.verbose {
+                // Write the results (optional)
+                writeln!(self.stdout, "{:#?}: {} byte(s) overwritten.", path, metadata.len())?;
+            }
+        } else {
+            // Perform a dry run (optional)
+            writeln!(self.stdout, "{:#?}: {} byte(s) will be overwritten.", path, metadata.len())?;
+        }
+        return Ok(());
     }
 }
