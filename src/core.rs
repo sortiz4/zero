@@ -124,8 +124,7 @@ impl Zero {
         self.validate()?;
 
         // Loop through the paths
-        self.overwrite()?;
-        return Ok(());
+        return self.overwrite();
     }
 
     /// Checks for conflicts in the options.
@@ -163,7 +162,7 @@ impl Zero {
         let mut input = String::new();
         loop {
             // Prompt the user and normalize the input
-            write!(self.stderr, "{:#?} {} - continue? [y/n] ", path, prompt)?;
+            write!(self.stderr, r#""{}" {} - continue? [y/n] "#, path.display(), prompt)?;
             self.stdin.read_line(&mut input)?;
 
             // The response must be `y` or `n`
@@ -196,24 +195,28 @@ impl Zero {
             }
 
             if path.is_file() {
-                // The path is a valid file
+                // The path is a file
                 self.overwrite_file(&path)?;
-            } else if path.is_dir() {
-                // The path is a valid directory
-                if let Err(err) = self.overwrite_dir(&path) {
-                    writeln!(self.stderr, "Error: Cannot access {:#?}: {}", path, err)?;
-                }
             } else {
-                // The path could not be accessed
-                writeln!(self.stderr, "Error: Cannot access {:#?}", path)?;
+                // Try the path as a directory
+                self.overwrite_dir(&path)?;
             }
         }
         return Ok(());
     }
 
+    /// Overwrites all files in the given directory and writes all errors.
+    fn overwrite_dir(&mut self, path: &PathBuf) -> Result<()> {
+        return if let Err(err) = self.overwrite_dir_inner(path) {
+            self.write_error("Cannot access", path, &err)
+        } else {
+            Ok(())
+        };
+    }
+
     /// Overwrites all files in the given directory. If the `recursive` option
     /// is present, all files under the given directory will overwritten.
-    fn overwrite_dir(&mut self, path: &PathBuf) -> Result<()> {
+    fn overwrite_dir_inner(&mut self, path: &PathBuf) -> Result<()> {
         for entry in path.read_dir()? {
             let path = entry?.path();
 
@@ -229,10 +232,11 @@ impl Zero {
 
     /// Overwrites the given file and writes all errors.
     fn overwrite_file(&mut self, path: &PathBuf) -> Result<()> {
-        if let Err(err) = self.overwrite_file_inner(path) {
-            writeln!(self.stderr, "Error: Cannot overwrite {:#?}: {}", path, err)?;
-        }
-        return Ok(());
+        return if let Err(err) = self.overwrite_file_inner(path) {
+            self.write_error("Cannot overwrite", path, &err)
+        } else {
+            Ok(())
+        };
     }
 
     /// Overwrites the given file. Authorization may be requested and
@@ -242,7 +246,7 @@ impl Zero {
     fn overwrite_file_inner(&mut self, path: &PathBuf) -> Result<()> {
         if self.options.interactive {
             // Authorize every file (optional)
-            if let Ok(false) = self.auth(&path, Context::Interactive) {
+            if let Ok(false) = self.auth(path, Context::Interactive) {
                 return Ok(());
             }
         }
@@ -264,12 +268,24 @@ impl Zero {
 
             if self.options.verbose {
                 // Write the results (optional)
-                writeln!(self.stdout, "{:#?}: {} byte(s) overwritten.", path, metadata.len())?;
+                self.write_result("overwritten", path, metadata.len())?;
             }
         } else {
             // Perform a dry run (optional)
-            writeln!(self.stdout, "{:#?}: {} byte(s) will be overwritten.", path, metadata.len())?;
+            self.write_result("will be overwritten", path, metadata.len())?;
         }
+        return Ok(());
+    }
+
+    /// Writes a path related error to the standard error stream.
+    fn write_error(&mut self, msg: &str, path: &PathBuf, err: &Error) -> Result<()> {
+        writeln!(self.stderr, r#"Error: {} "{}": {}"#, msg, path.display(), err)?;
+        return Ok(());
+    }
+
+    /// Writes the result of an operation to the standard output stream.
+    fn write_result(&mut self, msg: &str, path: &PathBuf, len: u64) -> Result<()> {
+        writeln!(self.stdout, r#""{}": {} byte(s) {}."#, path.display(), len, msg)?;
         return Ok(());
     }
 }
