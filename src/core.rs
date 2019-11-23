@@ -120,14 +120,14 @@ impl Zero {
             return self.version();
         }
 
-        // Check for conflicting options
+        // Validate the options
         self.validate()?;
 
-        // Loop through the paths
+        // Handle the paths
         return self.overwrite();
     }
 
-    /// Checks for conflicts in the options.
+    /// Validates the options.
     fn validate(&self) -> Result<()> {
         return if self.options.interactive && self.options.suppress {
             Err(Error::Conflict)
