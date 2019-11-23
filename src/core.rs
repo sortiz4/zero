@@ -49,7 +49,7 @@ struct Options {
     #[structopt(short = "v", long = "version")]
     version: bool,
 
-    /// The paths to be accessed by the tool.
+    /// The paths to be accessed by this tool.
     #[structopt(name = "PATHS", parse(from_str))]
     paths: Vec<PathBuf>,
 }
