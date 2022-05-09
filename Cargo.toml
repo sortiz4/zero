@@ -1,6 +1,6 @@
 [package]
 name = "zero"
-edition = "2018"
+edition = "2021"
 version = "2.0.0"
 license = "MIT License"
 authors = ["Steven Ortiz"]
@@ -13,4 +13,4 @@ name = "zero"
 doc = false
 
 [dependencies]
-structopt = { version = "0.3.4", default-features = false }
+structopt = { version = "0.3.26", default-features = false }

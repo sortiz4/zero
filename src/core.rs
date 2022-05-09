@@ -99,7 +99,23 @@ impl Zero {
 
     /// Runs this program and writes all errors.
     pub fn run(&mut self) -> Result<()> {
-        match self.run_inner() {
+        let mut run = || -> Result<()> {
+            // Write the help or version message
+            if self.options.help {
+                return self.help();
+            }
+            if self.options.version {
+                return self.version();
+            }
+
+            // Validate the options
+            self.validate()?;
+
+            // Handle the paths
+            return self.overwrite();
+        };
+
+        match run() {
             Ok(val) => {
                 return Ok(val);
             },
@@ -108,32 +124,6 @@ impl Zero {
                 return Err(err);
             },
         }
-    }
-
-    /// Runs this program.
-    fn run_inner(&mut self) -> Result<()> {
-        // Write the help or version message
-        if self.options.help {
-            return self.help();
-        }
-        if self.options.version {
-            return self.version();
-        }
-
-        // Validate the options
-        self.validate()?;
-
-        // Handle the paths
-        return self.overwrite();
-    }
-
-    /// Validates the options.
-    fn validate(&self) -> Result<()> {
-        return if self.options.interactive && self.options.suppress {
-            Err(Error::Conflict)
-        } else {
-            Ok(())
-        };
     }
 
     /// Writes the help message to the standard error stream.
@@ -150,9 +140,111 @@ impl Zero {
         return Ok(());
     }
 
+    /// Validates the options.
+    fn validate(&self) -> Result<()> {
+        return if self.options.interactive && self.options.suppress {
+            Err(Error::Conflict)
+        } else {
+            Ok(())
+        };
+    }
+
+    /// Overwrites all paths provided by the user. Authorization may be
+    /// requested if the `suppress` option is not present.
+    fn overwrite(&mut self) -> Result<()> {
+        for path in self.options.paths.to_owned() {
+            if !self.options.suppress && path.has_root() {
+                // Authorize absolute paths (optional)
+                if let Ok(false) = self.authorize(&path, Context::Absolute) {
+                    continue;
+                }
+            }
+
+            if path.is_file() {
+                // The path is a file
+                self.overwrite_file(&path)?;
+            } else {
+                // Try the path as a directory
+                self.overwrite_dir(&path)?;
+            }
+        }
+        return Ok(());
+    }
+
+    /// Overwrites all files in the given directory and writes all errors. If
+    /// the `recursive` option is present, all files under the given directory
+    /// will overwritten.
+    fn overwrite_dir(&mut self, path: &PathBuf) -> Result<()> {
+        let mut overwrite_dir = || -> Result<()> {
+            for entry in path.read_dir()? {
+                let path = entry?.path();
+
+                // Recurse if the entry is a directory (optional)
+                if self.options.recursive && path.is_dir() {
+                    self.overwrite_dir(&path)?;
+                } else if path.is_file() {
+                    self.overwrite_file(&path)?;
+                }
+            }
+            return Ok(());
+        };
+
+        return if let Err(err) = overwrite_dir() {
+            self.write_error("Cannot access", path, &err)
+        } else {
+            Ok(())
+        };
+    }
+
+    /// Overwrites the given file and writes all errors. Authorization may be
+    /// requested and additional information may be written if the
+    /// `interactive` and `verbose` options are present. The file will not be
+    /// overwritten during a `dry-run`.
+    fn overwrite_file(&mut self, path: &PathBuf) -> Result<()> {
+        let mut overwrite_file = || -> Result<()> {
+            if self.options.interactive {
+                // Authorize every file (optional)
+                if let Ok(false) = self.authorize(path, Context::Interactive) {
+                    return Ok(());
+                }
+            }
+            let metadata = path.metadata()?;
+
+            if !self.options.dry_run {
+                // Open the file and wrap it in a buffer
+                let mut file = OpenOptions::new().write(true).open(path)?;
+                let mut buf = BufWriter::new(file);
+
+                // Overwrite the file
+                for _ in 0..metadata.len() {
+                    buf.write(&[0])?;
+                }
+
+                // Flush the buffer to the disk
+                file = buf.into_inner()?;
+                file.sync_all()?;
+
+                if self.options.verbose {
+                    // Write the results (optional)
+                    self.write_result("overwritten", path, metadata.len())?;
+                }
+            } else {
+                // Perform a dry run (optional)
+                self.write_result("will be overwritten", path, metadata.len())?;
+            }
+            return Ok(());
+        };
+
+        return if let Err(err) = overwrite_file() {
+            self.write_error("Cannot overwrite", path, &err)
+        } else {
+            Ok(())
+        };
+    }
+
     /// Authorizes directory and file access by prompting the user and reading
     /// from the standard input stream.
-    fn auth(&mut self, path: &PathBuf, context: Context) -> Result<bool> {
+    fn authorize(&mut self, path: &PathBuf, context: Context) -> Result<bool> {
         // Determine the appropriate prompt
         let prompt = match context {
             Context::Absolute => "is absolute",
@@ -181,100 +273,6 @@ impl Zero {
                 },
             }
         }
-    }
-
-    /// Overwrites all paths provided by the user. Authorization may be
-    /// requested if the `suppress` option is not present.
-    fn overwrite(&mut self) -> Result<()> {
-        for path in self.options.paths.to_owned() {
-            if !self.options.suppress && path.has_root() {
-                // Authorize absolute paths (optional)
-                if let Ok(false) = self.auth(&path, Context::Absolute) {
-                    continue;
-                }
-            }
-
-            if path.is_file() {
-                // The path is a file
-                self.overwrite_file(&path)?;
-            } else {
-                // Try the path as a directory
-                self.overwrite_dir(&path)?;
-            }
-        }
-        return Ok(());
-    }
-
-    /// Overwrites all files in the given directory and writes all errors.
-    fn overwrite_dir(&mut self, path: &PathBuf) -> Result<()> {
-        return if let Err(err) = self.overwrite_dir_inner(path) {
-            self.write_error("Cannot access", path, &err)
-        } else {
-            Ok(())
-        };
-    }
-
-    /// Overwrites all files in the given directory. If the `recursive` option
-    /// is present, all files under the given directory will overwritten.
-    fn overwrite_dir_inner(&mut self, path: &PathBuf) -> Result<()> {
-        for entry in path.read_dir()? {
-            let path = entry?.path();
-
-            // Recurse if the entry is a directory (optional)
-            if self.options.recursive && path.is_dir() {
-                self.overwrite_dir(&path)?;
-            } else if path.is_file() {
-                self.overwrite_file(&path)?;
-            }
-        }
-        return Ok(());
-    }
-
-    /// Overwrites the given file and writes all errors.
-    fn overwrite_file(&mut self, path: &PathBuf) -> Result<()> {
-        return if let Err(err) = self.overwrite_file_inner(path) {
-            self.write_error("Cannot overwrite", path, &err)
-        } else {
-            Ok(())
-        };
-    }
-
-    /// Overwrites the given file. Authorization may be requested and
-    /// additional information may be written if the `interactive` and
-    /// `verbose` options are present. The file will not be overwritten
-    /// during a `dry-run`.
-    fn overwrite_file_inner(&mut self, path: &PathBuf) -> Result<()> {
-        if self.options.interactive {
-            // Authorize every file (optional)
-            if let Ok(false) = self.auth(path, Context::Interactive) {
-                return Ok(());
-            }
-        }
-        let metadata = path.metadata()?;
-
-        if !self.options.dry_run {
-            // Open the file and wrap it in a buffer
-            let mut file = OpenOptions::new().write(true).open(path)?;
-            let mut buf = BufWriter::new(file);
-
-            // Overwrite the file
-            for _ in 0..metadata.len() {
-                buf.write(&[0])?;
-            }
-
-            // Flush the buffer to the disk
-            file = buf.into_inner()?;
-            file.sync_all()?;
-
-            if self.options.verbose {
-                // Write the results (optional)
-                self.write_result("overwritten", path, metadata.len())?;
-            }
-        } else {
-            // Perform a dry run (optional)
-            self.write_result("will be overwritten", path, metadata.len())?;
-        }
-        return Ok(());
     }
 
     /// Writes a path related error to the standard error stream.
