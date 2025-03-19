@@ -1,5 +1,5 @@
 # Zero
-Zero is a security-focused command line utility that permanently erases files
+`zero` is a security-focused command line utility that permanently erases files
 by overwriting file contents with zeros before removal, preventing potential
 data recovery.
 
