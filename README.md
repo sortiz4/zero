@@ -1,7 +1,7 @@
 # Zero
-Zero is a fast, simple, single-pass command line tool that securely erases
-files by zero-filling them. It's non-recursive and non-verbose by default, and
-always prompts the user before descending into absolute paths.
+Zero is a security-focused command line utility that permanently erases files
+by overwriting file contents with zeros before removal, preventing potential
+data recovery.
 
 ## Usage
 Zero expects one or more paths. All files in directories will be overwritten.

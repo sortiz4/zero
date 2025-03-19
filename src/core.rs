@@ -1,3 +1,5 @@
+use clap::CommandFactory;
+use clap::Parser;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
 use std::io;
@@ -7,7 +9,6 @@ use std::io::Stdin;
 use std::io::Stdout;
 use std::io::Write;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use super::Error;
 use super::Result;
 
@@ -18,39 +19,39 @@ enum Context {
     Interactive,
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(about = "Securely erase files (single-pass).")]
+#[derive(Debug, Parser)]
+#[command(version, disable_help_flag = true, disable_version_flag = true, about = "Securely erase files (single-pass).")]
 struct Options {
     /// Do not overwrite any files (verbose).
-    #[structopt(short = "d", long = "dry-run")]
+    #[arg(short = 'd', long = "dry-run")]
     dry_run: bool,
 
     /// Prompt before overwriting each file.
-    #[structopt(short = "i", long = "interactive")]
+    #[arg(short = 'i', long = "interactive")]
     interactive: bool,
 
     /// Recursively descend into directories.
-    #[structopt(short = "r", long = "recursive")]
+    #[arg(short = 'r', long = "recursive")]
     recursive: bool,
 
     /// Suppress all interaction.
-    #[structopt(short = "s", long = "suppress")]
+    #[arg(short = 's', long = "suppress")]
     suppress: bool,
 
     /// Explain what's being done.
-    #[structopt(short = "V", long = "verbose")]
+    #[arg(short = 'V', long = "verbose")]
     verbose: bool,
 
     /// Show this message.
-    #[structopt(short = "h", long = "help")]
+    #[arg(short = 'h', long = "help")]
     help: bool,
 
     /// Show the version.
-    #[structopt(short = "v", long = "version")]
+    #[arg(short = 'v', long = "version")]
     version: bool,
 
     /// The paths to be accessed by this tool.
-    #[structopt(name = "PATHS", parse(from_str))]
+    #[arg(name = "PATHS")]
     paths: Vec<PathBuf>,
 }
 
@@ -71,7 +72,7 @@ impl Zero {
     {
         return Ok(
             Self {
-                options: Options::from_iter_safe(iter)?,
+                options: Options::try_parse_from(iter)?,
                 stderr: io::stderr(),
                 stdout: io::stdout(),
                 stdin: io::stdin(),
@@ -104,6 +105,7 @@ impl Zero {
             if self.options.help {
                 return self.help();
             }
+
             if self.options.version {
                 return self.version();
             }
@@ -128,15 +130,13 @@ impl Zero {
 
     /// Writes the help message to the standard error stream.
     fn help(&mut self) -> Result<()> {
-        Options::clap().write_help(&mut self.stderr)?;
-        writeln!(self.stderr, "")?;
+        write!(self.stderr, "{}", Options::command().render_help())?;
         return Ok(());
     }
 
     /// Writes the version message to the standard error stream.
     fn version(&mut self) -> Result<()> {
-        Options::clap().write_version(&mut self.stderr)?;
-        writeln!(self.stderr, "")?;
+        write!(self.stderr, "{}", Options::command().render_version())?;
         return Ok(());
     }
 
@@ -168,6 +168,7 @@ impl Zero {
                 self.overwrite_dir(&path)?;
             }
         }
+
         return Ok(());
     }
 
@@ -186,6 +187,7 @@ impl Zero {
                     self.overwrite_file(&path)?;
                 }
             }
+
             return Ok(());
         };
 
@@ -208,6 +210,7 @@ impl Zero {
                     return Ok(());
                 }
             }
+
             let metadata = path.metadata()?;
 
             if !self.options.dry_run {
@@ -232,6 +235,7 @@ impl Zero {
                 // Perform a dry run (optional)
                 self.write_result("will be overwritten", path, metadata.len())?;
             }
+
             return Ok(());
         };
 
@@ -252,6 +256,7 @@ impl Zero {
         };
 
         let mut input = String::new();
+
         loop {
             // Prompt the user and normalize the input
             write!(self.stderr, r#""{}" {} - continue? [y/n] "#, path.display(), prompt)?;
